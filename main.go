@@ -5,12 +5,12 @@
 package main
 
 import (
+	"chat-app/chat"
 	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -39,44 +39,44 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	3) 다중 server와 redis 사이의 통신 테스트 -
 */
 func main() {
-	var ctx = context.Background()
+	// var ctx = context.Background()
 
-	var redisClient = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "qwer1234",
-	})
-
-	out := redisClient.Set(ctx, "kaye4", "3", 0)
-	fmt.Println("out", out)
-	if out.Err() != nil {
-		panic("??")
-	}
-
-	res := redisClient.Get(ctx, "kaye4")
-	fmt.Println("res", res)
-	if res.Err() != nil {
-		panic("???")
-	}
-
-	go subscribe(ctx, redisClient)
-
-	time.Sleep(time.Second * 2)
-
-	for i := 0; i < 5; i++ {
-		publish(ctx, redisClient)
-	}
-
-	// flag.Parse()
-	// hub := newHub()
-	// go hub.run()
-	// http.HandleFunc("/", serveHome)
-	// http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-	// 	serveWs(hub, w, r)
+	// var redisClient = redis.NewClient(&redis.Options{
+	// 	Addr:     "localhost:6379",
+	// 	Password: "qwer1234",
 	// })
-	// err := http.ListenAndServe(*addr, nil)
-	// if err != nil {
-	// 	log.Fatal("ListenAndServe: ", err)
+
+	// out := redisClient.Set(ctx, "kaye4", "3", 0)
+	// fmt.Println("out", out)
+	// if out.Err() != nil {
+	// 	panic("??")
 	// }
+
+	// res := redisClient.Get(ctx, "kaye4")
+	// fmt.Println("res", res)
+	// if res.Err() != nil {
+	// 	panic("???")
+	// }
+
+	// go subscribe(ctx, redisClient)
+
+	// time.Sleep(time.Second * 2)
+
+	// for i := 0; i < 5; i++ {
+	// 	publish(ctx, redisClient)
+	// }
+
+	flag.Parse()
+	hub := chat.NewHub()
+	go hub.Run()
+	http.HandleFunc("/", serveHome)
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		chat.ServeWs(hub, w, r)
+	})
+	err := http.ListenAndServe(*addr, nil)
+	if err != nil {
+		log.Fatal("ListenAndServe: ", err)
+	}
 }
 
 func publish(ctx context.Context, redisClient *redis.Client) {
