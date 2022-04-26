@@ -8,7 +8,7 @@
         var msg = document.getElementById('msg')
         var log = document.getElementById('log')
 
-        var user = { id: '1', name: 'k1' }
+        var user = { id: '3', name: 'k3' }
         var roomId = '1'
 
         function appendLog(item) {
@@ -42,7 +42,7 @@
         }
 
         if (window['WebSocket']) {
-          conn = new WebSocket('ws://' + document.location.host + '/ws')
+          conn = new WebSocket('ws://localhost:8081/ws')
           conn.onclose = function (evt) {
             var item = document.createElement('div')
             item.innerHTML = '<b>Connection closed.</b>'

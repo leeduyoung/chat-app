@@ -6,12 +6,25 @@ package chat
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
+	"chat-app/chat/event"
+	"chat-app/chat/redis"
+
 	"github.com/gorilla/websocket"
 )
+
+var redisClient redis.IRedisClientService
+
+func init() {
+	ctx := context.Background()
+	redisClient = redis.New(ctx)
+}
 
 const (
 	// Time allowed to write a message to the peer.
@@ -25,6 +38,8 @@ const (
 
 	// Maximum message size allowed from peer.
 	maxMessageSize = 512
+
+	chatChannel = "atc-chat-channel"
 )
 
 var (
@@ -46,6 +61,9 @@ type Client struct {
 
 	// Buffered channel of outbound messages.
 	send chan []byte
+
+	// User unique id
+	userID string
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -70,7 +88,35 @@ func (c *Client) readPump() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		c.hub.broadcast <- message
+		// c.hub.broadcast <- message
+
+		/*
+			1. redis에 roomID의 데이터를 조회해온다.
+			2. redis에서 가져온 값이 있을 경우 add, 없을 경우 새롭게 리스트를 만든다.
+			3. redis에 저장한다.
+			4. hub에 enter, leave을 보낸다.
+			5. 클라이언트에서 들어온 메시지를 redis로 publish 한다.
+		*/
+		msg := &event.ChatEvent{}
+		json.Unmarshal(message, msg)
+
+		users := []string{}
+		data, err := redisClient.Get(msg.RoomID)
+		if err == nil {
+			json.Unmarshal([]byte(data), &users)
+		}
+		users = append(users, msg.UserID)
+		redisClient.Set(msg.RoomID, users)
+
+		switch msg.MessageType {
+		case event.MessageTypeEnter:
+			c.userID = msg.UserID
+			c.hub.enter <- c
+		case event.MessageTypeLeave:
+			c.hub.leave <- c
+		}
+
+		publish(string(message))
 	}
 }
 
@@ -101,12 +147,12 @@ func (c *Client) writePump() {
 			}
 			w.Write(message)
 
-			// Add queued chat messages to the current websocket message.
-			n := len(c.send)
-			for i := 0; i < n; i++ {
-				w.Write(newline)
-				w.Write(<-c.send)
-			}
+			// // Add queued chat messages to the current websocket message.
+			// n := len(c.send)
+			// for i := 0; i < n; i++ {
+			// 	w.Write(newline)
+			// 	w.Write(<-c.send)
+			// }
 
 			if err := w.Close(); err != nil {
 				return
@@ -134,4 +180,47 @@ func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	// new goroutines.
 	go client.writePump()
 	go client.readPump()
+	// go client.subscribe()
+}
+
+// /*
+// 	1. Reids subscribe -> 유저가 보낸 메시지를 받아온다.
+// 	2. 메시지 안에 roomID를 사용해서 redis에서 user ID목록 조회
+// 	3. userID 목록을 순회하면서 client를 찾고 메시지 send
+// */
+// func (c *Client) subscribe() {
+// 	ctx := context.Background()
+// 	subscriber := redisClient.Subscribe(redis.MsgToSub{
+// 		Channels: []string{chatChannel},
+// 	})
+
+// 	for {
+// 		msg, err := subscriber.ReceiveMessage(ctx)
+// 		if err != nil {
+// 			panic(err)
+// 		}
+
+// 		fmt.Println("[subscribe] msg: ", msg)
+// 		data := event.ChatEvent{}
+// 		json.Unmarshal([]byte(msg.Payload), &data)
+
+// 		users := []string{}
+// 		response, err := redisClient.Get(data.RoomID)
+// 		if err == nil {
+// 			json.Unmarshal([]byte(response), &users)
+// 		}
+
+// 		c.hub.broadcastMessage <- BroadcastMessage{
+// 			targetID: users,
+// 			message:  []byte(msg.Payload),
+// 		}
+// 	}
+// }
+
+func publish(msg string) {
+	fmt.Println("[publish] msg: ", msg)
+	redisClient.Publish(redis.MsgToPub{
+		Channel: chatChannel,
+		Message: msg,
+	})
 }
