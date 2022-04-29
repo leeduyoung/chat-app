@@ -180,42 +180,7 @@ func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	// new goroutines.
 	go client.writePump()
 	go client.readPump()
-	// go client.subscribe()
 }
-
-// /*
-// 	1. Reids subscribe -> 유저가 보낸 메시지를 받아온다.
-// 	2. 메시지 안에 roomID를 사용해서 redis에서 user ID목록 조회
-// 	3. userID 목록을 순회하면서 client를 찾고 메시지 send
-// */
-// func (c *Client) subscribe() {
-// 	ctx := context.Background()
-// 	subscriber := redisClient.Subscribe(redis.MsgToSub{
-// 		Channels: []string{chatChannel},
-// 	})
-
-// 	for {
-// 		msg, err := subscriber.ReceiveMessage(ctx)
-// 		if err != nil {
-// 			panic(err)
-// 		}
-
-// 		fmt.Println("[subscribe] msg: ", msg)
-// 		data := event.ChatEvent{}
-// 		json.Unmarshal([]byte(msg.Payload), &data)
-
-// 		users := []string{}
-// 		response, err := redisClient.Get(data.RoomID)
-// 		if err == nil {
-// 			json.Unmarshal([]byte(response), &users)
-// 		}
-
-// 		c.hub.broadcastMessage <- BroadcastMessage{
-// 			targetID: users,
-// 			message:  []byte(msg.Payload),
-// 		}
-// 	}
-// }
 
 func publish(msg string) {
 	fmt.Println("[publish] msg: ", msg)
