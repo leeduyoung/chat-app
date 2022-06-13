@@ -37,6 +37,8 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	fmt.Println("called main")
+
 	flag.Parse()
 
 	hub := chat.NewHub()

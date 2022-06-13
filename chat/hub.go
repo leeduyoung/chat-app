@@ -83,12 +83,24 @@ func (h *Hub) Subscribe() {
 
 		users := []string{}
 		response, err := redisClient.Get(data.RoomID)
-		if err == nil {
-			json.Unmarshal([]byte(response), &users)
+		if err != nil {
+			fmt.Println("redist client get error: ", err)
+		}
+
+		json.Unmarshal([]byte(response), &users)
+
+		// 중복 유저 제거
+		m := make(map[string]bool)
+		targetIDs := []string{}
+		for _, userID := range users {
+			if _, ok := m[userID]; !ok {
+				m[userID] = true
+				targetIDs = append(targetIDs, userID)
+			}
 		}
 
 		h.broadcastMessage <- BroadcastMessage{
-			targetID: users,
+			targetID: targetIDs,
 			message:  []byte(msg.Payload),
 		}
 	}

@@ -105,6 +105,7 @@ func (c *Client) readPump() {
 		if err == nil {
 			json.Unmarshal([]byte(data), &users)
 		}
+
 		users = append(users, msg.UserID)
 		redisClient.Set(msg.RoomID, users)
 
